@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  antink-server:
+    build: .
+    container_name: antink-server
+    privileged: true
+    devices:
+      - /dev/fuse
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - ./it24_host:/it24_host
+      - ./antink_mount:/antink_mount
+      - ./antink-logs:/var/log
+    command: ["/antink", "/antink_mount"]
+    restart: unless-stopped
+
+  antink-logger:
+    image: debian:latest
+    container_name: antink-logger
+    volumes:
+      - ./antink-logs:/var/log
+    command: tail -f /var/log/it24.log
+    restart: unless-stopped
