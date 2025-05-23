@@ -60,4 +60,19 @@ services:
 * Bind-mount folder dari host ke dalam container
 
 ## 3.3 antink.c
+1. Library dan Constant
+    ```c
+    #define FUSE_USE_VERSION 31
+    #include <fuse3/fuse.h>
+    #include <stdio.h>
+    #include <string.h>
+    #include <errno.h>
+    #include <fcntl.h>
+    #include <dirent.h>
+    #include <stdlib.h>
+    #include <unistd.h>
+    #include <time.h>
+    #include <ctype.h>
 
+    const char *orig_dir = "/it24_host";
+    const char *log_path = "/var/log/it24.log";
