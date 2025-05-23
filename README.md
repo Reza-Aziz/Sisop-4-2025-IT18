@@ -26,7 +26,7 @@ CMD ["/antink", "/antink_mount"] </pre>
 * Compile antink.c menjadi executable /antink menggunakan flag dari FUSE
 * Menentukan perintah default saat container dijalankan. Jalankan /antink dengan argumen /antink_mount sebagai mount point
 
-## 4.2 docker-compose.yml
+## 3.2 docker-compose.yml
 <pre>
 version: '3.8'
 
@@ -58,3 +58,6 @@ services:
 * Menyusun image dari Dockerfile di folder saat ini dan beri nama container antink-server
 * Memberikan akses dan izin ke container agar FUSE bisa bekerja
 * Bind-mount folder dari host ke dalam container
+
+## 3.3 antink.c
+
