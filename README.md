@@ -702,6 +702,8 @@ services:
     * Jika FUSE gagal, akan terlihat dari pesan log container
 
 # Soal 4
+Pada soal ini kita diminta untuk membuat sistem berkas virtual menggunakan FUSE yang merepresentasikan 7 area dalam dunia maimai, yaitu: starter, metro, dragon, blackrose, heaven, youth, dan 7sref. Masing-masing area memiliki perilaku khusus terkait bagaimana file disimpan dan ditampilkan.
+
 1. Header dan Definisi
    ```c
    #define FUSE_USE_VERSION 31
@@ -738,3 +740,239 @@ services:
        return full_path;
    } </pre>
    * Mengembalikan path file asli di dalam folder chiho. Untuk area 7sref, fungsi ini menerjemahkan nama file seperti metro_data.txt menjadi chiho/metro/data.txt
+
+3. Fungsi shift_filename
+   <pre>
+   void shift_filename(char *out, const char *in, int shift) {
+       int i;
+       for (i = 0; in[i]; i++) {
+           out[i] = in[i] + ((i+1) % 256);
+       }
+       out[i] = '\0';
+   } </pre>
+   * Digunakan di area metro. Mengubah nama file dengan cara menambahkan posisi ASCII sesuai posisinya
+
+4. Fungsi rot13
+   <pre>
+   void rot13(char *s) {
+       for (int i = 0; s[i]; i++) {
+           if ((s[i] >= 'A' && s[i] <= 'Z')) s[i] = ((s[i] - 'A' + 13) % 26) + 'A';
+           else if ((s[i] >= 'a' && s[i] <= 'z')) s[i] = ((s[i] - 'a' + 13) % 26) + 'a';
+       }
+   } </pre>
+   * Digunakan di area dragon. Mengenkripsi/dekripsi isi file dengan algoritma ROT13 saat membaca
+
+5. Fungsi aes_decrypt
+   <pre>
+   void aes_decrypt(unsigned char *ciphertext, int len, unsigned char *plaintext) {
+       EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+       unsigned char key[32] = AES_KEY;
+       unsigned char iv[16];
+       memcpy(iv, ciphertext, 16);
+
+       EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv);
+
+       int len_out, len_tmp;
+       EVP_DecryptUpdate(ctx, plaintext, &len_out, ciphertext + 16, len - 16);
+       EVP_DecryptFinal_ex(ctx, plaintext + len_out, &len_tmp);
+
+       EVP_CIPHER_CTX_free(ctx);
+   } </pre>
+   * Digunakan di area heaven. Mendekripsi isi file AES-256-CBC dengan IV yang dibaca dari 16 byte pertama file
+
+6. Fungsi decompress_gzip
+   <pre>
+   int decompress_gzip(const char *in, char *out, size_t in_size, size_t out_size) {
+       z_stream zs;
+       memset(&zs, 0, sizeof(zs));
+       zs.next_in = (Bytef *)in;
+       zs.avail_in = in_size;
+       zs.next_out = (Bytef *)out;
+       zs.avail_out = out_size;
+
+       inflateInit2(&zs, 15 + 16);
+       int ret = inflate(&zs, Z_FINISH);
+       inflateEnd(&zs);
+
+       return ret == Z_STREAM_END ? zs.total_out : -1;
+   } </pre>
+   * Digunakan di area youth. Mendekompresi isi file gzip menggunakan zlib saat file dibaca
+
+7. Fungsi maimai_getattr
+   <pre>
+   static int maimai_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
+       (void) fi;
+       int res;
+       char *real_path = get_real_path(path);
+       res = lstat(real_path, stbuf);
+       if (res == -1)
+           return -errno;
+       return 0;
+   } </pre>
+   * Mengembalikan atribut file, seperti ukuran dan mode akses. Digunakan oleh semua area
+
+8. Fungsi maimai_readdir
+   <pre>
+   static int maimai_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi,
+                             enum fuse_readdir_flags flags) {
+       (void) offset;
+       (void) fi;
+       (void) flags;
+
+       char *real_path = get_real_path(path);
+       DIR *dp;
+       struct dirent *de;
+
+       dp = opendir(real_path);
+       if (dp == NULL)
+           return -errno;
+
+       while ((de = readdir(dp)) != NULL) {
+           struct stat st;
+           memset(&st, 0, sizeof(st));
+           st.st_ino = de->d_ino;
+           st.st_mode = de->d_type << 12;
+
+            char name[256];
+            if (strstr(path, "/starter") == path && strstr(de->d_name, ".mai")) {
+                strncpy(name, de->d_name, strlen(de->d_name) - 4);
+                name[strlen(de->d_name) - 4] = '\0';
+            } else if (strstr(path, "/metro") == path) {
+                shift_filename(name, de->d_name, 1);
+            } else {
+                strcpy(name, de->d_name);
+            }
+            filler(buf, name, &st, 0, 0);
+        }
+        closedir(dp);
+        return 0;
+   } </pre>
+   Menampilkan isi direktori:
+   * Area starter menyembunyikan ekstensi .mai
+   * Area metro memodifikasi nama file sesuai shift
+   * Area lainnya default
+
+9. Fungsi maimai_open
+   <pre>
+   static int maimai_open(const char *path, struct fuse_file_info *fi) {
+       char *real_path = get_real_path(path);
+       int res = open(real_path, fi->flags);
+       if (res == -1)
+           return -errno;
+       close(res);
+       return 0;
+   } </pre>
+   * Membuka file tanpa modifikasi khusus
+
+10. Fungsi maimai_read
+    <pre>
+    static int maimai_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+        (void) fi;
+        int fd;
+        int res;
+        char *real_path = get_real_path(path);
+
+        fd = open(real_path, O_RDONLY);
+        if (fd == -1)
+        return -errno;
+
+        char temp[4096] = {0};
+        res = pread(fd, temp, sizeof(temp), offset);
+        if (res == -1) {
+            close(fd);
+            return -errno;
+        }
+
+        if (strstr(path, "/dragon") == path) {
+            strncpy(buf, temp, size);
+            rot13(buf);
+        } else if (strstr(path, "/heaven") == path) {
+            aes_decrypt((unsigned char *)temp, res, (unsigned char *)buf);
+        } else if (strstr(path, "/youth") == path) {
+            decompress_gzip(temp, buf, res, size);
+        } else {
+            memcpy(buf, temp, res);
+        }
+
+        close(fd);
+        return size;
+    } </pre>
+    Membaca isi file sesuai area:
+    * starter, metro, blackrose: default
+    * dragon: ROT13
+    * heaven: AES-256 decrypt
+    * youth: gzip decompress
+   
+11. Fungsi maimai_write
+    <pre>
+    static int maimai_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+        (void) fi;
+        int fd;
+        int res;
+        char *real_path = get_real_path(path);
+
+        fd = open(real_path, O_WRONLY);
+        if (fd == -1)
+            return -errno;
+
+        res = pwrite(fd, buf, size, offset);
+        if (res == -1)
+            res = -errno;
+
+        close(fd);
+        return res;
+    } </pre>
+    * Menulis data secara langsung (belum mendukung enkripsi/compression saat menulis)
+
+12. Fungsi maimai_create
+    <pre>
+    static int maimai_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+        char *real_path = get_real_path(path);
+        static char new_path[PATH_MAX];
+        if (strstr(path, "/starter") == path) {
+            snprintf(new_path, sizeof(new_path), "%s.mai", real_path);
+            real_path = new_path;
+        }
+
+        int fd = creat(real_path, mode);
+        if (fd == -1)
+            return -errno;
+        close(fd);
+        return 0;
+    } </pre>
+    Membuat file baru:
+    * starter: otomatis menambahkan .mai saat disimpan ke direktori asli
+
+13. Fungsi maimai_unlink
+    <pre>
+    static int maimai_unlink(const char *path) {
+        char *real_path = get_real_path(path);
+        static char new_path[PATH_MAX];
+        if (strstr(path, "/starter") == path) {
+            snprintf(new_path, sizeof(new_path), "%s.mai", real_path);
+            real_path = new_path;
+        }
+
+        int res = unlink(real_path);
+        if (res == -1)
+            return -errno;
+        return 0;
+    } </pre>
+    * Menghapus file dari sistem. Di area starter, file yang dihapus adalah yang memiliki ekstensi .mai
+
+14. Fungsi main
+    <pre>
+    static const struct fuse_operations maimai_oper = {
+        .getattr = maimai_getattr,
+        .readdir = maimai_readdir,
+        .open = maimai_open,
+        .read = maimai_read,
+        .write = maimai_write,
+        .create = maimai_create,
+        .unlink = maimai_unlink,
+    };
+
+    int main(int argc, char *argv[]) {
+        return fuse_main(argc, argv, &maimai_oper, NULL);
+    }  </pre>
+    * Menjalankan FUSE dengan fungsi-fungsi yang telah didefinisikan di atas
