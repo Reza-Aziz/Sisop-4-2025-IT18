@@ -2,7 +2,7 @@
 # Soal 1
 ## Library
 <pre>
- #include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 </pre>
 
+## Fungsi Timestamp
 <pre>
  void get_timestamp(char *buffer, size_t size) {
     time_t now = time(NULL);
