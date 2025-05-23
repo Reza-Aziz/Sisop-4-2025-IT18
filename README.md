@@ -716,6 +716,25 @@ services:
    #include <dirent.h>
    #include <sys/stat.h>
    #include <sys/types.h>
-#include <openssl/evp.h>
-#include <openssl/rand.h>
-#include <zlib.h>
+   #include <openssl/evp.h>
+   #include <openssl/rand.h>
+   #include <zlib.h>
+
+2. Fungsi get_real_path
+   <pre>
+   char *get_real_path(const char *path) {
+    static char full_path[PATH_MAX];
+    const char *area = strtok(strdup(path), "/");
+    const char *filename = path + strlen(area) + 1;
+
+    if (strcmp(area, "7sref") == 0) {
+        static char redirected[PATH_MAX];
+        sscanf(filename, "%[^_]_%s", full_path, redirected);
+        snprintf(full_path, sizeof(full_path), "%s/%s/%s", BASE_DIR, full_path, redirected);
+        return full_path;
+    }
+
+    snprintf(full_path, sizeof(full_path), "%s%s", BASE_DIR, path);
+    return full_path;
+} </pre>
+    * Mengembalikan path file asli di dalam folder chiho. Untuk area 7sref, fungsi ini menerjemahkan nama file seperti metro_data.txt menjadi chiho/metro/data.txt
