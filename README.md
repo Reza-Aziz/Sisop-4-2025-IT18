@@ -84,6 +84,81 @@ int hex_to_bin(const char *hex, unsigned char **bin, size_t *bin_size) {
 * Return Sukses: Return 0 jika konversi berhasil.
 * Harus free: Jangan lupa free(*bin) setelah selesai pakai.
 
+### int main()
+<pre>
+int main() {
+    mkdir("image", 0755); 
+
+    DIR *dir;
+    struct dirent *entry;
+    dir = opendir("anomali");
+    if (!dir) {
+        perror("opendir anomali/");
+        return 1;
+    }
+
+    FILE *log_file = fopen("conversion.log", "a");
+    if (!log_file) {
+        perror("conversion.log");
+        return 1;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strstr(entry->d_name, ".txt")) {
+            char filepath[256];
+            snprintf(filepath, sizeof(filepath), "anomali/%s", entry->d_name);
+
+            FILE *f = fopen(filepath, "r");
+            if (!f) continue;
+
+            fseek(f, 0, SEEK_END);
+            long fsize = ftell(f);
+            fseek(f, 0, SEEK_SET);
+
+            char *hex_content = malloc(fsize + 1);
+            fread(hex_content, 1, fsize, f);
+            hex_content[fsize] = '\0';
+            fclose(f);
+
+            unsigned char *bin_data = NULL;
+            size_t bin_size = 0;
+            if (hex_to_bin(hex_content, &bin_data, &bin_size) != 0) {
+                fprintf(stderr, "Failed to convert hex in file %s\n", filepath);
+                free(hex_content);
+                continue;
+            }
+
+            char timestamp[32];
+            get_timestamp(timestamp, sizeof(timestamp));
+
+            char filename_only[64];
+            strncpy(filename_only, entry->d_name, sizeof(filename_only));
+            strtok(filename_only, ".");
+
+            char output_filename[128];
+            snprintf(output_filename, sizeof(output_filename),
+                     "image/%s_image_%s.png", filename_only, timestamp);
+
+            FILE *img = fopen(output_filename, "wb");
+            fwrite(bin_data, 1, bin_size, img);
+            fclose(img);
+
+            char logtime[64];
+            get_log_timestamp(logtime, sizeof(logtime));
+            fprintf(log_file, "%s: Successfully converted hexadecimal text %s to %s.\n",
+                    logtime, entry->d_name, strrchr(output_filename, '/') + 1);
+
+            free(hex_content);
+            free(bin_data);
+        }
+    }
+
+    fclose(log_file);
+    closedir(dir);
+    return 0;
+}
+</pre>
+
 # Soal 2
 # Soal 3
 Pada soal ini kita diminta untuk membuat sebuah sistem pendeteksi kenakalan bernama Anti Napis Kimcun (AntiNK) untuk melindungi file-file penting milik angkatan 24. 
