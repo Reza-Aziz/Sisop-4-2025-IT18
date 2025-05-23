@@ -700,3 +700,22 @@ services:
     revisi:
     * Tambahkan log debug ke main
     * Jika FUSE gagal, akan terlihat dari pesan log container
+
+# Soal 4
+1. Header dan Definisi
+   ```c
+   #define FUSE_USE_VERSION 31
+   #include <fuse3/fuse.h>
+   #include <stdio.h>
+   #include <string.h>
+   #include <errno.h>
+   #include <fcntl.h>
+   #include <unistd.h>
+   #include <stdlib.h>
+   #include <time.h>
+   #include <dirent.h>
+   #include <sys/stat.h>
+   #include <sys/types.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#include <zlib.h>
