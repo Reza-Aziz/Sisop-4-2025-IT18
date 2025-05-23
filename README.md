@@ -1,6 +1,6 @@
 # Sisop-4-2025-IT18
 # Soal 1
-## Library
+### Library
 <pre>
 #include <stdio.h>
 #include <stdlib.h>
