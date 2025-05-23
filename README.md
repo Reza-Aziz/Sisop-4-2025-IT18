@@ -19,13 +19,13 @@
 }
 </pre>
 * time_t now = time(NULL);
-→ Ambil waktu saat ini dalam bentuk detik sejak 1 Jan 1970 (epoch).
+-> Ambil waktu saat ini dalam bentuk detik sejak 1 Jan 1970 (epoch).
 
 * struct tm *t = localtime(&now);
-→ Convert now jadi struktur waktu lokal (struct tm) yang punya info lengkap kayak tahun, bulan, tanggal, jam, dst.
+-> Convert now jadi struktur waktu lokal (struct tm) yang punya info lengkap kayak tahun, bulan, tanggal, jam, dst.
 
 * strftime(buffer, size, "%Y-%m-%d_%H:%M:%S", t);
-→ Format struct tm jadi string yang ditulis ke buffer.
+-> Format struct tm jadi string yang ditulis ke buffer.
 
 ### Fungsi get_log_timestamp
 <pre>
@@ -78,9 +78,9 @@ int hex_to_bin(const char *hex, unsigned char **bin, size_t *bin_size) {
 * Gabungkan Nibble: Gabungkan 2 digit hex (high & low) ke 1 byte: (high << 4) | low.
 * Alokasi Memori: malloc digunakan untuk simpan hasil array byte.
 * Penanganan Error: Return -1 jika:
-- Panjang string ganjil
-- Karakter invalid
-- malloc gagal
+-> Panjang string ganjil
+-> Karakter invalid
+-> malloc gagal
 * Return Sukses: Return 0 jika konversi berhasil.
 * Harus free: Jangan lupa free(*bin) setelah selesai pakai.
 
