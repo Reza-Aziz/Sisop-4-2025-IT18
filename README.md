@@ -55,6 +55,6 @@ services:
       - ./antink-logs:/var/log
     command: tail -f /var/log/it24.log
     restart: unless-stopped </pre>
-    * Menyusun image dari Dockerfile di folder saat ini dan beri nama container antink-server
-    * Memberikan akses dan izin ke container agar FUSE bisa bekerja
-    * Bind-mount folder dari host ke dalam container
+* Menyusun image dari Dockerfile di folder saat ini dan beri nama container antink-server
+* Memberikan akses dan izin ke container agar FUSE bisa bekerja
+* Bind-mount folder dari host ke dalam container
