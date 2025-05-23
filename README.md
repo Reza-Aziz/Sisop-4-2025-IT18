@@ -1,5 +1,30 @@
 # Sisop-4-2025-IT18
 # Soal 1
+## Library
+<pre>
+ #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <dirent.h>
+#include <sys/stat.h>
+</pre>
+
+<pre>
+ void get_timestamp(char *buffer, size_t size) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(buffer, size, "%Y-%m-%d_%H:%M:%S", t);
+}
+</pre>
+* time_t now = time(NULL);
+→ Ambil waktu saat ini dalam bentuk detik sejak 1 Jan 1970 (epoch).
+
+* struct tm *t = localtime(&now);
+→ Convert now jadi struktur waktu lokal (struct tm) yang punya info lengkap kayak tahun, bulan, tanggal, jam, dst.
+
+* strftime(buffer, size, "%Y-%m-%d_%H:%M:%S", t);
+→ Format struct tm jadi string yang ditulis ke buffer.
 # Soal 2
 # Soal 3
 Pada soal ini kita diminta untuk membuat sebuah sistem pendeteksi kenakalan bernama Anti Napis Kimcun (AntiNK) untuk melindungi file-file penting milik angkatan 24. 
