@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 </pre>
 
-## Fungsi Timestamp
+### Fungsi get_timestamp
 <pre>
  void get_timestamp(char *buffer, size_t size) {
     time_t now = time(NULL);
@@ -26,6 +26,64 @@
 
 * strftime(buffer, size, "%Y-%m-%d_%H:%M:%S", t);
 → Format struct tm jadi string yang ditulis ke buffer.
+
+### Fungsi get_log_timestamp
+<pre>
+void get_log_timestamp(char *buffer, size_t size) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(buffer, size, "[%Y-%m-%d][%H:%M:%S]", t);
+}
+</pre>
+* Mengambil waktu saat ini (time(NULL)).
+* Mengubahnya ke format waktu lokal.
+* Memformat waktu tersebut jadi string dengan format [YYYY-MM-DD][HH:MM:SS].
+
+### Fungsi hex_char_to_byte
+<pre>
+int hex_char_to_byte(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+</pre>
+*  parsing string hex, misalnya "4F" → 79 dalam desimal (4 * 16 + 15).
+
+### Fungsi hex_to_bin
+<pre>
+int hex_to_bin(const char *hex, unsigned char **bin, size_t *bin_size) {
+    size_t len = strlen(hex);
+    if (len % 2 != 0) return -1;
+
+    *bin_size = len / 2;
+    *bin = malloc(*bin_size);
+    if (!*bin) return -1;
+
+    for (size_t i = 0; i < *bin_size; ++i) {
+        int high = hex_char_to_byte(hex[2*i]);
+        int low = hex_char_to_byte(hex[2*i+1]);
+        if (high == -1 || low == -1) {
+            free(*bin);
+            return -1;
+        }
+        (*bin)[i] = (high << 4) | low;
+    }
+    return 0;
+}
+</pre>
+* Konversi Hex ke Biner: Fungsi mengubah string heksadesimal menjadi array byte (unsigned char *).
+* Validasi Panjang: String hex harus genap (tiap 2 karakter jadi 1 byte).
+* Konversi per Karakter: Gunakan hex_char_to_byte untuk konversi tiap karakter ke angka.
+* Gabungkan Nibble: Gabungkan 2 digit hex (high & low) ke 1 byte: (high << 4) | low.
+* Alokasi Memori: malloc digunakan untuk simpan hasil array byte.
+* Penanganan Error: Return -1 jika:
+- Panjang string ganjil
+- Karakter invalid
+- malloc gagal
+* Return Sukses: Return 0 jika konversi berhasil.
+* Harus free: Jangan lupa free(*bin) setelah selesai pakai.
+
 # Soal 2
 # Soal 3
 Pada soal ini kita diminta untuk membuat sebuah sistem pendeteksi kenakalan bernama Anti Napis Kimcun (AntiNK) untuk melindungi file-file penting milik angkatan 24. 
