@@ -517,3 +517,186 @@ services:
 
     const char *orig_dir = "/it24_host";
     const char *log_path = "/var/log/it24.log";
+
+## 3.3 antink.c
+2. Fungsi write_log()
+   <pre>
+   void write_log(const char *msg) {
+       FILE *log = fopen(log_path, "a");
+       if (!log) return;
+
+       time_t now = time(NULL);
+       struct tm *t = localtime(&now);
+
+       fprintf(log, "[%04d-%02d-%02d %02d:%02d:%02d] %s\n",
+           t->tm_year+1900, t->tm_mon+1, t->tm_mday,
+           t->tm_hour, t->tm_min, t->tm_sec, msg);
+       fclose(log);
+   } </pre>
+   * Untuk mencatat log ke file
+   * Buka log dalam mode append, jika gagal keluar
+   * Ambil waktu sekarang dan ubah ke format lokal
+   * Tulis log dengan timestamp lalu tutup file
+
+3. Fungsi is_badfile()
+   <pre>
+   int is_badfile(const char *filename) {
+       char low[1024];
+       snprintf(low, sizeof(low), "%s", filename);
+       for (int i = 0; low[i]; i++) low[i] = tolower(low[i]);
+       return strstr(low, "nafis") || strstr(low, "kimcun");
+   } </pre>
+   * Untuk mendeteksi nama file mencurigakan (nafis dan kimcun)
+   * Salin nama file, lowcase, lalu cari keyword
+
+4. Fungsi rot13()
+   <pre>
+   void rot13(char *text) {
+       for (int i = 0; text[i]; i++) {
+           if ('a' <= text[i] && text[i] <= 'z')
+               text[i] = 'a' + (text[i] - 'a' + 13) % 26;
+           else if ('A' <= text[i] && text[i] <= 'Z')
+               text[i] = 'A' + (text[i] - 'A' + 13) % 26;
+       }
+   } </pre>
+   * Untuk mengenkripsi isi file biasa saat dibaca
+   * Algoritma enkripsi dengan pergeseran 13 huruf (A = N)
+
+5. Fungsi reverse()
+   <pre>
+   void reverse(char *dst, const char *src) {
+       int len = strlen(src);
+       for (int i = 0; i < len; i++)
+           dst[i] = src[len - i - 1];
+       dst[len] = '\0';
+   } </pre>
+   * Untuk membalik nama file jika mengandung nafis/kimcun
+
+6. FUSE getattr
+   <pre>
+   static int antink_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
+       (void) fi;
+       int res;
+       char full[1024];
+       snprintf(full, sizeof(full), "%s%s", orig_dir, path);
+       res = lstat(full, stbuf);
+       if (res == -1) return -errno;
+       return 0;
+   } </pre>
+   * Untuk mendapatkan file
+   * Ambil stat file asli, jika gagal kembalikan error
+
+7. FUSE readdir
+   <pre>
+   static int antink_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags) {
+       (void) offset; (void) fi; (void) flags;
+       char full[1024];
+       snprintf(full, sizeof(full), "%s%s", orig_dir, path);
+       DIR *dp = opendir(full);
+       if (!dp) return -errno;
+
+       struct dirent *de;
+       while ((de = readdir(dp)) != NULL) {
+           char *name = de->d_name;
+           char display[1024];
+
+           if (is_badfile(name)) {
+               reverse(display, name);
+               char logmsg[2048];
+               snprintf(logmsg, sizeof(logmsg),
+                        "ALERT: Detected bad file name %s", name);
+                write_log(logmsg);
+           } else {
+               snprintf(display, sizeof(display), "%s", name);
+           }
+
+           filler(buf, display, NULL, 0, 0);
+       }
+
+       closedir(dp);
+       return 0;
+   } </pre>
+   * Untuk menampilkan isi direktori, tapi nama file nakal dibalik
+   * ditulis ke log
+
+8. FUSE open
+   <pre>
+   static int antink_open(const char *path, struct fuse_file_info *fi) {
+       char full[1024];
+       snprintf(full, sizeof(full), "%s%s", orig_dir, path);
+       int fd = open(full, fi->flags);
+       if (fd == -1) return -errno;
+       close(fd);
+
+       char logmsg[1024];
+       snprintf(logmsg, sizeof(logmsg), "READ: %s", path + 1);  // skip leading '/'
+       write_log(logmsg);
+       return 0;
+   } </pre>
+   * Untuk membuka file dari direktori asli
+   * Menambahkan log READ: <namafile>
+
+9. FUSE read
+   <pre>
+   static int antink_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+       (void) fi;
+       char full[1024];
+       snprintf(full, sizeof(full), "%s%s", orig_dir, path);
+       FILE *f = fopen(full, "r");
+       if (!f) return -errno;
+
+       fseek(f, 0, SEEK_END);
+       size_t len = ftell(f);
+       fseek(f, 0, SEEK_SET);
+
+       char *temp = malloc(len + 1);
+       fread(temp, 1, len, f);
+       temp[len] = '\0';
+       fclose(f);
+
+       if (!is_badfile(path)) {
+           rot13(temp);
+       }
+
+       size_t to_copy = size;
+       if (offset < len) {
+           if (offset + size > len)
+               to_copy = len - offset;
+           memcpy(buf, temp + offset, to_copy);
+        } else {
+           to_copy = 0;
+       }
+
+       free(temp);
+       return to_copy;
+   } </pre>
+   * Untuk membaca isi file .txt
+   * Jika file tidak berbahaya, isi difilter ROT13
+   * Kalau berbahaya, isi ditampilkan asli
+
+10. Struktur FUSE
+    <pre>
+    static const struct fuse_operations antink_oper = {
+        .getattr = antink_getattr,
+        .readdir = antink_readdir,
+        .open    = antink_open,
+        .read    = antink_read,
+    }; </pre>
+    * Menyambungkan handler FUSE ke fungsi
+
+11. Fungsi Main
+    <pre>
+    int main(int argc, char *argv[]) {
+        printf("[INFO] Mounting FUSE on: %s\n", argv[1]);
+        fflush(stdout);
+        umask(0);
+        int res = fuse_main(argc, argv, &antink_oper, NULL);
+        printf("[INFO] FUSE exited with code %d\n", res);
+        fflush(stdout);
+        return res;
+    } </pre>
+    * main() menjalankan FUSE mount
+    * Menghubungkan semua operasi yang di definisikan di atas
+    revisi:
+    * Tambahkan log debug ke main
+    * Jika FUSE gagal, akan terlihat dari pesan log container
